@@ -111,40 +111,41 @@ function build_result(α, status, msg)
    return α, status
 end
 
+function examine_and_update_predictions!(α, distances_to_center, distances_to_decision_boundary, R,
+        KKT_violations, black_list, K, C, opt_precision)
+    i2 = sample(KKT_violations)
+    if examineExample!(α, i2, distances_to_center, K, C, opt_precision)
+        distances_to_center, distances_to_decision_boundary, R = calculate_predictions(α, K, C, opt_precision)
+    else
+        push!(black_list, i2)
+    end
+    return distances_to_center, distances_to_decision_boundary, R
+end
+
 function smo(α, K, C, opt_precision, max_iterations)
-
     distances_to_center, distances_to_decision_boundary, R = calculate_predictions(α, K, C, opt_precision)
-    iter = 0
 
+    iter = 0
     while iter < max_iterations
+        # Fall back strategy: add indices to black list if examine can not make positive step.
+        # See page 9, J. Platt, "Sequential minimal optimization: A fast algorithm for training support vector machines," 1998.
         black_list = Set{Int}()
         iter += 1
 
         # scan over all data
         KKT_violation_all_idx = filter(i -> violates_KKT_condition(i, distances_to_decision_boundary, α, C, opt_precision) && i ∉ black_list, eachindex(α))
-
-        isempty(KKT_violation_all_idx) && return build_result(α, :Optimal, "No more KKT_violations.")
-
-        i2 = sample(KKT_violation_all_idx)
-        if examineExample!(α, i2, distances_to_center, K, C, opt_precision)
-            distances_to_center, distances_to_decision_boundary, R = calculate_predictions(α, K, C, opt_precision)
+        if isempty(KKT_violation_all_idx)
+            build_result(α, :Optimal, "No more KKT_violations.")
         else
-            push!(black_list, i2)
+            distances_to_center, distances_to_decision_boundary, R = examine_and_update_predictions!(α, distances_to_center, distances_to_decision_boundary, R, KKT_violation_all_idx, black_list, K, C, opt_precision)
         end
 
         # scan over SV_nb
         SV_nb = (α .> opt_precision) .& (α .< C - opt_precision)
         KKT_violations_in_SV_nb = filter(i -> violates_KKT_condition(i, distances_to_decision_boundary, α, C, opt_precision) && i ∉ black_list, findall(SV_nb))
-
         while length(KKT_violations_in_SV_nb) > 0 && iter < max_iterations
             iter += 1
-
-            i2 = sample(KKT_violations_in_SV_nb)
-            if examineExample!(α, i2, distances_to_center, K, C, opt_precision)
-                distances_to_center, distances_to_decision_boundary, R = calculate_predictions(α, K, C, opt_precision)
-            else
-                push!(black_list, i2)
-            end
+            distances_to_center, distances_to_decision_boundary, R = examine_and_update_predictions!(α, distances_to_center, distances_to_decision_boundary, R, KKT_violations_in_SV_nb, black_list, K, C, opt_precision)
             KKT_violations_in_SV_nb = filter(i -> violates_KKT_condition(i, distances_to_decision_boundary, α, C, opt_precision) && i ∉ black_list, findall(SV_nb))
         end
     end
