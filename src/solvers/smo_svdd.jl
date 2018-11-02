@@ -102,15 +102,6 @@ function initialize_alpha(data, C)
     return α
 end
 
-function build_result(α, status, msg)
-    if status == :Optimal
-        info(LOGGER, "Exit with status: $status. (" * msg * ")")
-    else
-        warn(LOGGER, "Exit with status: $status. (" * msg * ")")
-    end
-   return α, status
-end
-
 function examine_and_update_predictions!(α, distances_to_center, distances_to_decision_boundary, R,
         KKT_violations, black_list, K, C, opt_precision)
     i2 = sample(KKT_violations)
@@ -135,7 +126,7 @@ function smo(α, K, C, opt_precision, max_iterations)
         # scan over all data
         KKT_violation_all_idx = filter(i -> violates_KKT_condition(i, distances_to_decision_boundary, α, C, opt_precision) && i ∉ black_list, eachindex(α))
         if isempty(KKT_violation_all_idx)
-            build_result(α, :Optimal, "No more KKT_violations.")
+            return build_result(α, distances_to_decision_boundary, R, K, C, opt_precision, :Optimal, "No more KKT_violations.")
         else
             distances_to_center, distances_to_decision_boundary, R = examine_and_update_predictions!(α, distances_to_center, distances_to_decision_boundary, R, KKT_violation_all_idx, black_list, K, C, opt_precision)
         end
@@ -149,11 +140,30 @@ function smo(α, K, C, opt_precision, max_iterations)
             KKT_violations_in_SV_nb = filter(i -> violates_KKT_condition(i, distances_to_decision_boundary, α, C, opt_precision) && i ∉ black_list, findall(SV_nb))
         end
     end
-    return build_result(α, :UserLimit, "Reached max number of iterations.")
+    return build_result(α, distances_to_decision_boundary, R, K, C, opt_precision, :UserLimit, "Reached max number of iterations.")
+end
+
+function calculate_duality_gap(α, distances_to_decision_boundary, R, K, C, opt_precision)
+    sv_larger_than_zero_idx = findall(α .> opt_precision)
+    primal_obj = R + sum(distances_to_decision_boundary[distances_to_decision_boundary .> opt_precision] * C)
+    dual_obj = sum(α[i] * K[i,i] for i in sv_larger_than_zero_idx) - sum(α[i] * α[j] * K[i,j] for i in sv_larger_than_zero_idx for j in sv_larger_than_zero_idx)
+    duality_gap = primal_obj - dual_obj
+    return primal_obj, dual_obj, duality_gap
+end
+
+function build_result(α, distances_to_decision_boundary, R, K, C, opt_precision, status, msg)
+    if status == :Optimal
+        info(LOGGER, "Exit with status: $status. (" * msg * ")")
+    else
+        warn(LOGGER, "Exit with status: $status. (" * msg * ")")
+    end
+    primal_obj, dual_obj, duality_gap = calculate_duality_gap(α, distances_to_decision_boundary, R, K, C, opt_precision)
+    info(LOGGER, "duality gap: $duality_gap, primal objective: $primal_obj, dual objective: $dual_obj")
+   return α, primal_obj, duality_gap, duality_gap, status
 end
 
 function solve!(model::VanillaSVDD, solver::SMOSolver)
     α = initialize_alpha(model.data, model.C)
-    model.alpha_values, status = smo(α, model.K, model.C, solver.opt_precision, solver.max_iterations)
+    model.alpha_values, primal_obj, dual_obj, duality_gap, status = smo(α, model.K, model.C, solver.opt_precision, solver.max_iterations)
     return status
 end
