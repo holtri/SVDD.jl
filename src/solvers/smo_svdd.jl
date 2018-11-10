@@ -3,6 +3,11 @@ struct SMOSolver <: SVDDSolver
     max_iterations::Int
 end
 
+"""
+    takeStep!(α, i1, i2, K, C, opt_precision)
+
+    Take optimization step for i1 and i2 and update α.
+"""
 function takeStep!(α, i1, i2, K, C, opt_precision)
     i1 == i2 && return false
 
@@ -72,8 +77,13 @@ function second_choice_heuristic(i2, α, distances_to_center, C, opt_precision)
     findall(SV_nb)[findmax(abs.(distances_to_center[i2] .- distances_to_center[SV_nb]))[2]]
 end
 
-# The fallback strategies if second choice heuristic returns false follow recommendations in
-# J. Platt, "Sequential minimal optimization: A fast algorithm for training support vector machines," 1998.
+
+"""
+    examineExample!(α, i2, distances_to_center, K, C, opt_precision)
+
+    The fallback strategies if second choice heuristic returns false follow recommendations in
+    J. Platt, "Sequential minimal optimization: A fast algorithm for training support vector machines," 1998.
+"""
 function examineExample!(α, i2, distances_to_center, K, C, opt_precision)
     # use the second choice heuristic
     i1 = second_choice_heuristic(i2, α, distances_to_center, C, opt_precision)
@@ -113,6 +123,10 @@ function examine_and_update_predictions!(α, distances_to_center, distances_to_d
     return distances_to_center, distances_to_decision_boundary, R
 end
 
+"""
+    smo(α, K, C, opt_precision, max_iterations)
+    
+"""
 function smo(α, K, C, opt_precision, max_iterations)
     distances_to_center, distances_to_decision_boundary, R = calculate_predictions(α, K, C, opt_precision)
 
