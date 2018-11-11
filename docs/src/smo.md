@@ -1,15 +1,10 @@
-<style>
-.MathJax_Display {
-  text-align: left !important;
-}
-</style>
 # SMO
 
 Sequential Minimal Optimization (SMO) is a decomposition method to solve quadratic optimization problems with a specific structure. The original SMO algorithm by John C. Platt has been proposed for Support Vector Machines (SVM). There are several modifications for other types of support vector machines. This section describes the implementation of SMO for Support Vector Data Description (SVDD) [2].
 
 The implementation of SMO for SVDD bases on an adaption of SMO for one-class classification [3]. Therefore, this documentation focuses on the specific adaptions required for SVDD. The following descriptions assume familarity with the basics of SMO [1] and its adaption to one-class SVM [3], and of SVDD [2].
 
-## QP-Problem
+## SVDD Overview
 
 SVDD is an optimization problem of the following form.
 
@@ -36,23 +31,22 @@ D: \ & \underset{\alpha}{\text{maximize}}
 ```
 Solving the Lagrangian gives an optimal $α$.
 
-## Overview
+## SMO for SVDD
 
 The basic idea of SMO is to solve reduced versions of the Lagrangian iteratively.
 In each iteration, the reduced version of the Lagrangian consists of only two decision variables, i.e., $\alpha_{i1}$ and $\alpha_{i2}$, while $\alpha_j, j∉\{i1, i2\}$ are fixed.
 An iteration of SMO consists of two steps:
 
-1. Selection Step: Select $i1$ and $i2$.
+**Selection Step:** Select $i1$ and $i2$.
   * The search for a good $i2$ are implemented in [`SVDD.smo`](@ref)
   * There are several heuristics to select $i1$ based on the choice for $i2$. These heuristics are implemented in [`SVDD.examineExample!`](@ref)
-
-2. Optimization Step: Solving the reduced Lagrangian for $\alpha_{i1}$ and $\alpha_{i2}$.
+**Optimization Step:** Solving the reduced Lagrangian for $\alpha_{i1}$ and $\alpha_{i2}$.
   * Implemented in [`SVDD.takeStep!`](@ref)
 
 The iterative procedure converges to the global optimum.
 The following sections give details on both steps.
 
-#### Optimization Step: Solving the reduced Lagrangian
+### Optimization Step: Solving the reduced Lagrangian
 
 The following describes how to infer the optimal solution for a given $\alpha_{i1}$ and $\alpha{i2}$ analytically.
 
@@ -108,7 +102,7 @@ This optimization step is implemented in
 ```@docs
 SVDD.takeStep!
 ```
-#### selection Step: Finding a pair (i1, i2)
+### Selection Step: Finding a pair (i1, i2)
 
 To take an optimization step, one has to select i1 and i2 first.
 The rationale of SMO is to select indices that are likely to make a large step optimization step.
@@ -144,15 +138,24 @@ The check for KKT violations is implemented in
 ```
 
 [`SVDD.smo`](@ref) selects $i2$ by searching for indices that violate the KKT conditions.
-There are two tyes of search.
 
-_First type:_ SMO searches over the full data set, and randomly selects one of the violating indices.
+```@docs
+  SVDD.smo
+```
 
-_Second type:_ SMO restricts the search for violations to the subset where $0 <\alpha_i < C$.
+This function conducts two tyes of search.
+
+_First type:_ search over the full data set, and randomly selects one of the violating indices.
+
+_Second type:_ restricted search for violations over the subset where $0 <\alpha_i < C$.
 These variables are the non-bounded support vectors $SV_{nb}$.
 
 There is one search of the first type, then multiple searches of the second type.
-After each search, $i2$ is selected brandomly from one of the violating indices, see [`SVDD.examine_and_update_predictions!`](@ref).
+After each search, $i2$ is selected brandomly from one of the violating indices, see
+
+```@docs
+SVDD.examine_and_update_predictions!
+```
 
 ##### Selection of i1
 
@@ -179,17 +182,17 @@ The fallback strategies are implemented in
   SVDD.examineExample!
 ```
 
-#### Termination
+### Termination
 
 If there are no more KKT violations, the algorithm terminates.
 
-#### Further implementation details
+### Further implementation details
 
 This section describes some further implementation details.
 
 ##### Initialize alpha
 
-$\alpha$ hast to be initialized such that it fulfills the constraints.
+The vector $\alpha$ must be initialized such that it fulfills the constraints of $D$.
 The implementation uses the initialization strategy proposed in [3], i.e., randomly setting $\frac{1}{C}$ indices to $C$.
 This is implemented in
 
@@ -205,6 +208,11 @@ The distances to the decision boundary are calculated in
   SVDD.calculate_predictions
 ```
 
+In general, to calculate $R$, one can calculate the distance to any non-bounded support vector, i.e., $0 < \alpha_i < C$, as they all lie on the hypershpere.
+However, this may not always hold.
+There may be cases where the solution for R is not unique, and different support vectors result in different $R$, in particular in intermediate optimization steps where some $\alpha$ values may be non-bounded but violate the KKT conditions.
+Therefore, $R$ is averaged over all non-bounded support vectors.
+See also [4] for details on non-unique $R$ values.
 
 ##### SMO parameters
 
@@ -215,18 +223,17 @@ Small opt_precision values require a larger numver of iterations until terminati
 
 `max_iterations` controls the number of times a new $i2$ is selected to attempt an optimization step.
 
-
-## Internal API
+## External API
 
 ```@docs
-SVDD.examine_and_update_predictions!
+  SVDD.solve!(model::VanillaSVDD, solver::SMOSolver)
 ```
-```@docs
-SVDD.smo
-```
+
 ## References
 [1] J. Platt, "Sequential minimal optimization: A fast algorithm for training support vector machines," 1998.
 
 [2] D. M. J. Tax and R. P. W. Duin, "Support Vector Data Description,"" Mach. Learn., 2004.
 
 [3] B. Schölkopf, J. C. Platt, J. Shawe-Taylor, A. J. Smola, and R. C. Williamson, "Estimating the support of a high-dimensional distribution,"" Neural Comput., 2001.
+
+[4] W.-C. Chang, C.-P. Lee, and C.-J. Lin, "A revisit to support vector data description,"Nat. Taiwan Univ., Tech. Rep, 2013.

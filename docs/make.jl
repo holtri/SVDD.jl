@@ -6,10 +6,9 @@ makedocs(
     pages = [
         "Home" => "index.md",
         "Getting Started" => "start.md",
-            "Overview" => "index.md",
-            "Custom Solvers" => [
-                "SMO" => "smo.md"
-                ]
+        "Custom Solvers" => [
+            "SMO" => "smo.md"
+            ]
         ],
     format = :html,
     modules = [SVDD]

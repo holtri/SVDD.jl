@@ -183,15 +183,18 @@ end
 
 function build_result(α, distances_to_decision_boundary, R, K, C, opt_precision, status, msg)
     if status == :Optimal
-        info(LOGGER, "Exit with status: $status. (" * msg * ")")
+        info(LOGGER, "Exit with status: $status. ($msg)")
     else
-        warn(LOGGER, "Exit with status: $status. (" * msg * ")")
+        warn(LOGGER, "Exit with status: $status. ($msg)")
     end
     primal_obj, dual_obj, duality_gap = calculate_duality_gap(α, distances_to_decision_boundary, R, K, C, opt_precision)
     info(LOGGER, "duality gap: $duality_gap, primal objective: $primal_obj, dual objective: $dual_obj")
    return α, primal_obj, duality_gap, duality_gap, status
 end
 
+"""
+    solve!(model::VanillaSVDD, solver::SMOSolver)
+"""
 function solve!(model::VanillaSVDD, solver::SMOSolver)
     α = initialize_alpha(model.data, model.C)
     model.alpha_values, primal_obj, dual_obj, duality_gap, status = smo(α, model.K, model.C, solver.opt_precision, solver.max_iterations)
