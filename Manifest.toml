@@ -144,7 +144,7 @@ uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 deps = ["LinearAlgebra", "SpecialFunctions", "Statistics", "Test"]
 git-tree-sha1 = "456c6aa2928ae85064ef1d28b80d04fafed08986"
 repo-rev = "master"
-repo-url = "https://github.com/trthatcher/MLKernels.jl.git"
+repo-url = "https://github.com/holtri/MLKernels.jl"
 uuid = "48eadcf2-8ff1-11e8-289d-f103432a0bb3"
 version = "0.4.0"
 
