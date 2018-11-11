@@ -73,7 +73,7 @@ From this, one can infer the maximum and minumum value that one can much can add
 Second, the optimal value for $\alpha_{i2}$ can be derived analytically by setting the Lagrangian D to 0.
 
 ```math
-\frac{∇\text{D}}{\delta \alpha_{i2}} = 0
+∇\text{D}_{\alpha_{i2}} = 0
 \iff  \alpha*_{i2} = \dots
 ```
 
@@ -101,16 +101,77 @@ The implementation uses the decision rule from the original SMO [1, p.10], i.e.,
 ```
 
 where `opt_precision` is a parameter of the optimization algorithm.
+This optimization step is implemented in
+
+```@docs
+SVDD.takeStep!
+```
+### Step 1: Selecting i1 and i2
+
+To take an optimization step, one has to select i1 and i2 first.
+The rationale of SMO is to select indices that are likely to make a large step optimization step.
+SMO uses heuristics to first select i2, and then select i1 based on it.
+
+#### Selection of i2
+
+A minimum of $P$ has to obey the [KKT conditions](https://en.wikipedia.org/wiki/Karush%E2%80%93Kuhn%E2%80%93Tucker_conditions).
+The relevant KKT condition here is complementary slackness, i.e.,
+
+```math
+  \mu_i g_i(x*) = 0, \, \forall i
+```
+with dual variable $\mu$ and inequality conditions $g$.
+In other words, either the inequality constraint is fulfilled with equality, i.e., $g_i = 0$, or the Lagrange multiplier is zero, i.e., $\mu_i=0$.
+For SVDD, this translates to
+
+```math
+  \begin{aligned}
+    &\left\lVert a - \phi(x_i) \right\rVert^2 < R^2 \rightarrow \alpha_i = 0 \\
+    &\left\lVert a - \phi(x_i) \right\rVert^2 = R^2 \rightarrow  0 < \alpha_i < C\\
+    &\left\lVert a - \phi(x_i) \right\rVert^2 > R^2 \rightarrow \alpha_i = C
+ \end{aligned}
+```
+See [2] for details.
+So to check for KKT violations, one has to calculate the distance of $\phi(x_i)$ from the decision boundary, i.e., the left-hand side of the implications above, and compare it with the the respective $\alpha$ value.
+The check for KKT violations is implemented in
+
+```@docs
+  SVDD.violates_KKT_condition
+```
+
+[`SVDD.smo`](@ref) selects $i2$ by searching for indices that violate the KKT conditions.
+There are two tyes of search.
+
+_First type:_ SMO searches over the full data set, and randomly selects one of the violating indices.
+
+_Second type:_ SMO restricts the search for violations to the subset where $0 <\alpha_i < C$.
+These variables are the non-bounded support vectors (`SV_nb`).
+
+There is one search of the first type, then multiple searches of the second type.
+After each search, $i2$ is selected brandomly from one of the violating indices, see [`SVDD.examine_and_update_predictions!`](@ref).
+
+If there are no more violations, the algorithm terminates.
+
+### Further implementation details
+
+* initialize alpha
+* black_list
+* SMO parameters
+  * choice of opt_precision
+  * max_iterations (so what is an iteration really?)
+
+#### Selection of i1
 
 ## Internal API
 ```@docs
 SVDD.examineExample!
 ```
 ```@docs
-SVDD.smo
+SVDD.examine_and_update_predictions!
 ```
 ```@docs
-SVDD.takeStep!
+SVDD.smo
+
 ```
 ## References
 [1] J. Platt, "Sequential minimal optimization: A fast algorithm for training support vector machines," 1998.

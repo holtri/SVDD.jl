@@ -59,7 +59,10 @@ function calculate_predictions(α, K, C, opt_precision)
     distances_to_decision_boundary = distances_to_center .- R
     return (distances_to_center, distances_to_decision_boundary, R)
 end
+"""
+    violates_KKT_condition(i2, distances_to_decision_boundary, α, C, opt_precision)
 
+"""
 function violates_KKT_condition(i2, distances_to_decision_boundary, α, C, opt_precision)
     p1 = (α[i2] > opt_precision) && (distances_to_decision_boundary[i2] < -opt_precision) # inlier, but alpha > 0
     p2 = (α[i2] < C - opt_precision) && (distances_to_decision_boundary[i2] > opt_precision) # outlier, but alpha != C
@@ -112,6 +115,10 @@ function initialize_alpha(data, C)
     return α
 end
 
+"""
+    examine_and_update_predictions!(α, distances_to_center, distances_to_decision_boundary, R,
+        KKT_violations, black_list, K, C, opt_precision)
+"""
 function examine_and_update_predictions!(α, distances_to_center, distances_to_decision_boundary, R,
         KKT_violations, black_list, K, C, opt_precision)
     i2 = sample(KKT_violations)
@@ -125,7 +132,7 @@ end
 
 """
     smo(α, K, C, opt_precision, max_iterations)
-    
+
 """
 function smo(α, K, C, opt_precision, max_iterations)
     distances_to_center, distances_to_decision_boundary, R = calculate_predictions(α, K, C, opt_precision)
