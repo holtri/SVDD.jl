@@ -36,21 +36,23 @@ D: \ & \underset{\alpha}{\text{maximize}}
 ```
 Solving the Lagrangian gives an optimal $α$.
 
-## Decomposition
+## Overview
 
 The basic idea of SMO is to solve reduced versions of the Lagrangian iteratively.
 In each iteration, the reduced version of the Lagrangian consists of only two decision variables, i.e., $\alpha_{i1}$ and $\alpha_{i2}$, while $\alpha_j, j∉\{i1, i2\}$ are fixed.
 An iteration of SMO consists of two steps:
 
-1. Select $i1$ and $i2$.
+1. Selection Step: Select $i1$ and $i2$.
   * The search for a good $i2$ are implemented in [`SVDD.smo`](@ref)
   * There are several heuristics to select $i1$ based on the choice for $i2$. These heuristics are implemented in [`SVDD.examineExample!`](@ref)
-2. Solving the reduced Lagrangian for $\alpha_{i1}$ and $\alpha_{i2}$.
+
+2. Optimization Step: Solving the reduced Lagrangian for $\alpha_{i1}$ and $\alpha_{i2}$.
   * Implemented in [`SVDD.takeStep!`](@ref)
 
 The iterative procedure converges to the global optimum.
+The following sections give details on both steps.
 
-### Step 2: Solving the reduced Lagrangian
+#### Optimization Step: Solving the reduced Lagrangian
 
 The following describes how to infer the optimal solution for a given $\alpha_{i1}$ and $\alpha{i2}$ analytically.
 
@@ -106,13 +108,13 @@ This optimization step is implemented in
 ```@docs
 SVDD.takeStep!
 ```
-### Step 1: Selecting i1 and i2
+#### selection Step: Finding a pair (i1, i2)
 
 To take an optimization step, one has to select i1 and i2 first.
 The rationale of SMO is to select indices that are likely to make a large step optimization step.
 SMO uses heuristics to first select i2, and then select i1 based on it.
 
-#### Selection of i2
+##### Selection of i2
 
 A minimum of $P$ has to obey the [KKT conditions](https://en.wikipedia.org/wiki/Karush%E2%80%93Kuhn%E2%80%93Tucker_conditions).
 The relevant KKT condition here is complementary slackness, i.e.,
@@ -132,6 +134,8 @@ For SVDD, this translates to
  \end{aligned}
 ```
 See [2] for details.
+The distance to the decision boundary is $\left\lVert a - \phi(x_i) \right\rVert^2 - R^2$ which is negative for observations that lie in the hypershpere.
+
 So to check for KKT violations, one has to calculate the distance of $\phi(x_i)$ from the decision boundary, i.e., the left-hand side of the implications above, and compare it with the the respective $\alpha$ value.
 The check for KKT violations is implemented in
 
@@ -145,33 +149,80 @@ There are two tyes of search.
 _First type:_ SMO searches over the full data set, and randomly selects one of the violating indices.
 
 _Second type:_ SMO restricts the search for violations to the subset where $0 <\alpha_i < C$.
-These variables are the non-bounded support vectors (`SV_nb`).
+These variables are the non-bounded support vectors $SV_{nb}$.
 
 There is one search of the first type, then multiple searches of the second type.
 After each search, $i2$ is selected brandomly from one of the violating indices, see [`SVDD.examine_and_update_predictions!`](@ref).
 
-If there are no more violations, the algorithm terminates.
+##### Selection of i1
 
-### Further implementation details
+SMO selects $i1$ such that the optimization step is as large as possible.
+The idea for selecting $i1$ is as follows.
+For $\alpha_{i2} > 0$ and negative distance to decision boundary, alpha may decrease.
+So a good $\alpha_{i1}$ is one that is likely to increase in the optimization step, i.e., an index where the distance to the decision boundary is positive, and $\alpha_{i1} = 0$.
+The heuristic SMO selects the $i1$ with maximum absolute distance between the distance to the center of $i2$ and the distance to the center of some $i1 \in SV_{nb}$.
+(Note that using the distance to the decision boundary is equivalent to using the distance to the center in this step)
+This selection heuristic is implemented in
 
-* initialize alpha
-* black_list
-* SMO parameters
-  * choice of opt_precision
-  * max_iterations (so what is an iteration really?)
+```@docs
+  SVDD.second_choice_heuristic
+```
 
-#### Selection of i1
+In some cases, the selected $i1$ does not lead to a positive optimization step.
+In this case, there are two fallback strategies.
+First, all other indices in $SV_{nb}$ are selected, in random order, whether they result in a positive optimization step.
+Second, if there still is no $i1$ that results in a positive optimization step, all remaining indices are selected.
+If none of the fallback strategies works, $i2$ is skipped and added to a blacklist.
+The fallback strategies are implemented in
+
+```@docs
+  SVDD.examineExample!
+```
+
+#### Termination
+
+If there are no more KKT violations, the algorithm terminates.
+
+#### Further implementation details
+
+This section describes some further implementation details.
+
+##### Initialize alpha
+
+$\alpha$ hast to be initialized such that it fulfills the constraints.
+The implementation uses the initialization strategy proposed in [3], i.e., randomly setting $\frac{1}{C}$ indices to $C$.
+This is implemented in
+
+```@docs
+  SVDD.initialize_alpha
+```
+
+##### Calculating Distances to Decision Boundary
+
+The distances to the decision boundary are calculated in
+
+```@docs
+  SVDD.calculate_predictions
+```
+
+
+##### SMO parameters
+
+There are two parameters for SMO: opt_precision and max_iterations.
+
+`opt_precision` influences the convergence.
+Small opt_precision values require a larger numver of iterations until termination.
+
+`max_iterations` controls the number of times a new $i2$ is selected to attempt an optimization step.
+
 
 ## Internal API
-```@docs
-SVDD.examineExample!
-```
+
 ```@docs
 SVDD.examine_and_update_predictions!
 ```
 ```@docs
 SVDD.smo
-
 ```
 ## References
 [1] J. Platt, "Sequential minimal optimization: A fast algorithm for training support vector machines," 1998.

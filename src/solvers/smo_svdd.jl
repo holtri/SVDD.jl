@@ -41,6 +41,9 @@ end
 
 # TODO: this is a faster version of predict from classifier_svdd for in-sample predictions
 # this should be the default for in-sample predictions
+"""
+    calculate_predictions(α, K, C, opt_precision)
+"""
 function calculate_predictions(α, K, C, opt_precision)
     sv_larger_than_zero = α .> opt_precision
     sv_smaller_than_C = α .< (C - opt_precision)
@@ -72,6 +75,9 @@ end
 # See Equation (4.8) in
 # B. Schölkopf, J. C. Platt, J. Shawe-Taylor, A. J. Smola, and R. C. Williamson,
 # "Estimating the support of a high-dimensional distribution," 2001
+"""
+    second_choice_heuristic(i2, α, distances_to_center, C, opt_precision)
+"""
 function second_choice_heuristic(i2, α, distances_to_center, C, opt_precision)
     SV_nb = (α .> opt_precision) .& (α .< C - opt_precision)
     if !any(SV_nb)
@@ -107,6 +113,9 @@ function examineExample!(α, i2, distances_to_center, K, C, opt_precision)
     return false
 end
 
+"""
+    initialize_alpha(data, C)
+"""
 function initialize_alpha(data, C)
     n_init = trunc(Int, 1 / (C)) + 1
     α = fill(0.0, size(data, 2))
