@@ -19,3 +19,6 @@ makedocs(
 #=deploydocs(
     repo = "<repository url>"
 )=#
+deploydocs(
+    repo = "github.com/holtri/SVDD.jl.git",
+)
